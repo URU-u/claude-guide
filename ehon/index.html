@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f8e6dd">
+<title>おつかれ守護石ちゃん — 電子絵本</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #f8e6dd;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  }
+
+  body {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    color: #4a3b3f;
+  }
+
+  /* ---------- mood background (crossfading layers) ---------- */
+  .bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 900ms ease;
+    pointer-events: none;
+  }
+  .bg-layer.active { opacity: 1; }
+
+  .bg-cover { background: radial-gradient(circle at 30% 20%, #fff6f0 0%, #fbe2e6 55%, #f6cdd6 100%); }
+  .bg-p1    { background: linear-gradient(160deg, #f3ead9 0%, #e9d9c3 100%); }
+  .bg-p2    { background: linear-gradient(160deg, #efe1e6 0%, #d8c4d0 100%); }
+  .bg-p3    { background: linear-gradient(160deg, #ffe3ec 0%, #ffcbdb 100%); }
+  .bg-p4    { background: linear-gradient(160deg, #fbe7db 0%, #f2cdb8 100%); }
+  .bg-p5    { background: linear-gradient(160deg, #e9defa 0%, #c7abe0 100%); }
+  .bg-p6    { background: linear-gradient(160deg, #e0f5f7 0%, #b7e2ea 100%); }
+  .bg-p7    { background: linear-gradient(160deg, #6754a0 0%, #2c2150 100%); }
+  .bg-p8    { background: linear-gradient(160deg, #2b2f66 0%, #10122a 100%); }
+  .bg-p9    { background: linear-gradient(160deg, #fff2c9 0%, #ffd98f 100%); }
+  .bg-p10   { background: linear-gradient(160deg, #eaf6ff 0%, #ffe3f2 100%); }
+  .bg-end   { background: radial-gradient(circle at 70% 80%, #fff6f0 0%, #fbe2e6 55%, #f6cdd6 100%); }
+
+  /* sparkle particles */
+  .sparkle-field {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .sparkle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #fff;
+    border-radius: 50%;
+    opacity: 0;
+    filter: drop-shadow(0 0 3px #fff);
+    animation: twinkle 4.5s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0; transform: scale(0.4); }
+    50% { opacity: 0.85; transform: scale(1); }
+  }
+
+  /* ---------- top bar ---------- */
+  header.topbar {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    flex-shrink: 0;
+  }
+  .title-block {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    min-width: 0;
+  }
+  .title-block .main-title {
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #6b3f4a;
+  }
+  .title-block .sub-title {
+    font-size: 11px;
+    color: #9a6f78;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .page-indicator {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b3f4a;
+    background: rgba(255,255,255,0.65);
+    border-radius: 999px;
+    padding: 5px 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  /* ---------- viewer ---------- */
+  main.viewer {
+    position: relative;
+    z-index: 2;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .pages-track {
+    flex: 1 1 auto;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .pages-track::-webkit-scrollbar { display: none; }
+
+  .page-slide {
+    flex: 0 0 100%;
+    width: 100%;
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 10px 14px;
+  }
+
+  .cover-hint {
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    color: #a4707c;
+    animation: hintPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes hintPulse {
+    0%, 100% { opacity: 0.55; transform: translateX(0); }
+    50% { opacity: 1; transform: translateX(4px); }
+  }
+
+  .page-slide img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow: 0 8px 28px rgba(30,10,20,0.22);
+    cursor: zoom-in;
+    background: #fff;
+  }
+
+  .nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 4;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.55);
+    color: #6b3f4a;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: opacity 200ms, transform 150ms;
+  }
+  .nav-btn:active { transform: translateY(-50%) scale(0.9); }
+  .nav-btn.prev { left: 10px; }
+  .nav-btn.next { right: 10px; }
+  .nav-btn:disabled { opacity: 0.25; pointer-events: none; }
+
+  @media (min-width: 700px) {
+    .nav-btn { width: 52px; height: 52px; font-size: 28px; }
+    .nav-btn.prev { left: 20px; }
+    .nav-btn.next { right: 20px; }
+  }
+
+  /* ---------- thumbnails ---------- */
+  nav.thumbnails {
+    position: relative;
+    z-index: 5;
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+    overflow-x: auto;
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    scrollbar-width: none;
+  }
+  nav.thumbnails::-webkit-scrollbar { display: none; }
+
+  .thumb {
+    flex: 0 0 auto;
+    width: 54px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 150ms, transform 150ms;
+  }
+  .thumb img {
+    width: 54px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+    border: 2px solid transparent;
+  }
+  .thumb span {
+    font-size: 9px;
+    color: #6b3f4a;
+    font-weight: 600;
+  }
+  .thumb.active {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  .thumb.active img {
+    border-color: #e08fa3;
+  }
+
+  /* ---------- lightbox ---------- */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(15, 8, 12, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    overscroll-behavior: contain;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img {
+    max-width: 92vw;
+    max-height: 88vh;
+    touch-action: none;
+    will-change: transform;
+    user-select: none;
+    -webkit-user-drag: none;
+    border-radius: 10px;
+  }
+  .lightbox-close {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lightbox-hint {
+    position: absolute;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+  <div class="bg-layer active" id="bgA"></div>
+  <div class="bg-layer" id="bgB"></div>
+  <div class="sparkle-field" id="sparkleField"></div>
+
+  <header class="topbar">
+    <div class="title-block">
+      <span class="main-title">おつかれ守護石ちゃん</span>
+      <span class="sub-title">〜きょうも、だいじょうぶ。〜</span>
+    </div>
+    <div class="page-indicator" id="pageIndicator">表紙</div>
+  </header>
+
+  <main class="viewer">
+    <button class="nav-btn prev" id="prevBtn" aria-label="前のページ">‹</button>
+    <div class="pages-track" id="pagesTrack"></div>
+    <button class="nav-btn next" id="nextBtn" aria-label="次のページ">›</button>
+  </main>
+
+  <nav class="thumbnails" id="thumbnails"></nav>
+
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose" aria-label="閉じる">×</button>
+    <img id="lightboxImg" src="" alt="拡大画像">
+    <div class="lightbox-hint">ピンチ／ダブルタップで拡大・ドラッグで移動</div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var pages = [
+    { key: "cover", src: "images/cover_title.png", mood: "bg-cover", label: "表紙" },
+    { key: 1,  src: "images/page1.png",  mood: "bg-p1",  label: "1" },
+    { key: 2,  src: "images/page2.png",  mood: "bg-p2",  label: "2" },
+    { key: 3,  src: "images/page3.png",  mood: "bg-p3",  label: "3" },
+    { key: 4,  src: "images/page4.png",  mood: "bg-p4",  label: "4" },
+    { key: 5,  src: "images/page5.png",  mood: "bg-p5",  label: "5" },
+    { key: 6,  src: "images/page6.png",  mood: "bg-p6",  label: "6" },
+    { key: 7,  src: "images/page7.png",  mood: "bg-p7",  label: "7" },
+    { key: 8,  src: "images/page8.png",  mood: "bg-p8",  label: "8" },
+    { key: 9,  src: "images/page9.png",  mood: "bg-p9",  label: "9" },
+    { key: 10, src: "images/page10.png", mood: "bg-p10", label: "10" },
+    { key: "end", src: "images/cover_quote.png", mood: "bg-end", label: "おわり" }
+  ];
+
+  var track = document.getElementById("pagesTrack");
+  var thumbNav = document.getElementById("thumbnails");
+  var indicator = document.getElementById("pageIndicator");
+  var prevBtn = document.getElementById("prevBtn");
+  var nextBtn = document.getElementById("nextBtn");
+  var bgA = document.getElementById("bgA");
+  var bgB = document.getElementById("bgB");
+  var sparkleField = document.getElementById("sparkleField");
+  var lightbox = document.getElementById("lightbox");
+  var lightboxImg = document.getElementById("lightboxImg");
+  var lightboxClose = document.getElementById("lightboxClose");
+
+  var current = 0;
+  var showingA = true;
+  var thumbEls = [];
+
+  // ---- build slides ----
+  pages.forEach(function (p, i) {
+    var slide = document.createElement("div");
+    slide.className = "page-slide";
+    var img = document.createElement("img");
+    img.src = p.src;
+    img.alt = p.key === "cover" ? "表紙" : (p.key === "end" ? "おわりのことば" : ("ページ " + p.key));
+    img.loading = i === 0 ? "eager" : "lazy";
+    img.addEventListener("click", function () { openLightbox(p.src); });
+    slide.appendChild(img);
+
+    if (p.key === "cover") {
+      var hint = document.createElement("div");
+      hint.className = "cover-hint";
+      hint.textContent = "→ めくって、お話をはじめよう";
+      slide.appendChild(hint);
+    }
+
+    track.appendChild(slide);
+
+    var thumb = document.createElement("button");
+    thumb.className = "thumb";
+    thumb.innerHTML = '<img src="' + p.src + '" alt=""><span>' + p.label + "</span>";
+    thumb.addEventListener("click", function () { goTo(i); });
+    thumbNav.appendChild(thumb);
+    thumbEls.push(thumb);
+  });
+
+  // ---- sparkles ----
+  var sparklePositions = [
+    [8, 15], [22, 65], [40, 30], [58, 78], [72, 20],
+    [85, 55], [15, 85], [92, 88], [48, 8], [65, 45]
+  ];
+  sparklePositions.forEach(function (pos, i) {
+    var s = document.createElement("div");
+    s.className = "sparkle";
+    s.style.left = pos[0] + "%";
+    s.style.top = pos[1] + "%";
+    s.style.animationDelay = (i * 0.6) + "s";
+    sparkleField.appendChild(s);
+  });
+
+  function setMood(mood) {
+    var incoming = showingA ? bgB : bgA;
+    var outgoing = showingA ? bgA : bgB;
+    incoming.className = "bg-layer " + mood + " active";
+    outgoing.classList.remove("active");
+    showingA = !showingA;
+  }
+
+  function updateUI(index) {
+    current = index;
+    var p = pages[index];
+    indicator.textContent = (p.key === "cover" || p.key === "end") ? p.label : (p.label + " / 10");
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === pages.length - 1;
+    thumbEls.forEach(function (el, i) { el.classList.toggle("active", i === index); });
+    var activeThumb = thumbEls[index];
+    if (activeThumb) activeThumb.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    setMood(p.mood);
+  }
+
+  function goTo(index, smooth) {
+    var width = track.clientWidth;
+    track.scrollTo({ left: index * width, behavior: smooth === false ? "auto" : "smooth" });
+  }
+
+  var scrollRAF = null;
+  track.addEventListener("scroll", function () {
+    if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    scrollRAF = requestAnimationFrame(function () {
+      var width = track.clientWidth;
+      var idx = Math.round(track.scrollLeft / width);
+      idx = Math.max(0, Math.min(pages.length - 1, idx));
+      if (idx !== current) updateUI(idx);
+    });
+  });
+
+  prevBtn.addEventListener("click", function () { goTo(Math.max(0, current - 1)); });
+  nextBtn.addEventListener("click", function () { goTo(Math.min(pages.length - 1, current + 1)); });
+
+  window.addEventListener("keydown", function (e) {
+    if (lightbox.classList.contains("open")) {
+      if (e.key === "Escape") closeLightbox();
+      return;
+    }
+    if (e.key === "ArrowLeft") goTo(Math.max(0, current - 1));
+    if (e.key === "ArrowRight") goTo(Math.min(pages.length - 1, current + 1));
+  });
+
+  window.addEventListener("resize", function () { goTo(current, false); });
+
+  updateUI(0);
+
+  // ============ Lightbox zoom / pan ============
+  var scale = 1, tx = 0, ty = 0;
+  var pointers = new Map();
+  var lastDist = 0, lastMid = null;
+  var dragLast = null;
+  var lastTapTime = 0;
+
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  function applyTransform() {
+    lightboxImg.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + scale + ")";
+  }
+
+  function resetTransform() {
+    scale = 1; tx = 0; ty = 0;
+    applyTransform();
+  }
+
+  function openLightbox(src) {
+    lightboxImg.src = src;
+    resetTransform();
+    lightbox.classList.add("open");
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove("open");
+    pointers.clear();
+    lastDist = 0; lastMid = null; dragLast = null;
+  }
+
+  lightboxClose.addEventListener("click", closeLightbox);
+  lightbox.addEventListener("click", function (e) {
+    if (e.target === lightbox) closeLightbox();
+  });
+
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+  lightboxImg.addEventListener("pointerdown", function (e) {
+    lightboxImg.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1) {
+      dragLast = { x: e.clientX, y: e.clientY };
+    } else if (pointers.size === 2) {
+      var pts = Array.from(pointers.values());
+      lastDist = dist(pts[0], pts[1]);
+      lastMid = mid(pts[0], pts[1]);
+      dragLast = null;
+    }
+  });
+
+  lightboxImg.addEventListener("pointermove", function (e) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1 && dragLast && scale > 1) {
+      var dx = e.clientX - dragLast.x;
+      var dy = e.clientY - dragLast.y;
+      tx += dx; ty += dy;
+      dragLast = { x: e.clientX, y: e.clientY };
+      applyTransform();
+    } else if (pointers.size === 2) {
+      var pts = Array.from(pointers.values());
+      var newDist = dist(pts[0], pts[1]);
+      var newMid = mid(pts[0], pts[1]);
+      if (lastDist > 0) {
+        var factor = newDist / lastDist;
+        var newScale = clamp(scale * factor, 1, 4);
+        tx = newMid.x - (newMid.x - tx) * (newScale / scale);
+        ty = newMid.y - (newMid.y - ty) * (newScale / scale);
+        scale = newScale;
+        applyTransform();
+      }
+      lastDist = newDist;
+      lastMid = newMid;
+    }
+  });
+
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) { lastDist = 0; lastMid = null; }
+    if (pointers.size === 1) {
+      var remaining = Array.from(pointers.values())[0];
+      dragLast = { x: remaining.x, y: remaining.y };
+    }
+    if (pointers.size === 0) {
+      dragLast = null;
+      if (scale < 1.02) resetTransform();
+    }
+  }
+  lightboxImg.addEventListener("pointerup", endPointer);
+  lightboxImg.addEventListener("pointercancel", endPointer);
+
+  lightboxImg.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    var mx = e.clientX, my = e.clientY;
+    var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    var newScale = clamp(scale * factor, 1, 4);
+    tx = mx - (mx - tx) * (newScale / scale);
+    ty = my - (my - ty) * (newScale / scale);
+    scale = newScale;
+    if (scale <= 1) { tx = 0; ty = 0; }
+    applyTransform();
+  }, { passive: false });
+
+  function toggleZoom(clientX, clientY) {
+    if (scale > 1) {
+      resetTransform();
+    } else {
+      scale = 2.4;
+      var rect = lightboxImg.getBoundingClientRect();
+      var cx = clientX - (rect.left + rect.width / 2);
+      var cy = clientY - (rect.top + rect.height / 2);
+      tx = -cx * (scale - 1);
+      ty = -cy * (scale - 1);
+      applyTransform();
+    }
+  }
+
+  lightboxImg.addEventListener("pointerup", function (e) {
+    var now = Date.now();
+    if (now - lastTapTime < 300 && pointers.size === 0) {
+      toggleZoom(e.clientX, e.clientY);
+    }
+    lastTapTime = now;
+  });
+})();
+</script>
+</body>
+</html>
