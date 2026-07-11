@@ -314,6 +314,7 @@
     <button class="quick-btn" onclick="quickSend('Claudeのモデルの種類と違いを教えてください（Opus, Sonnet, Haiku）')">モデルの違いは？</button>
     <button class="quick-btn" onclick="quickSend('プロンプトキャッシュとは何ですか？どんなメリットがありますか？')">プロンプトキャッシュとは？</button>
     <button class="quick-btn" onclick="quickSend('Claude Codeのhooks機能とは何ですか？')">hooksって何？</button>
+    <button class="quick-btn" onclick="quickSend('Claude CodeのCLAUDE.md、スキル(skills)、/goalコマンドの使い方を教えてください')">CLAUDE.md・スキル・/goalとは？</button>
   </aside>
 
   <!-- Chat -->
@@ -354,6 +355,10 @@ const SYSTEM_PROMPT = `あなたは「Claudeガイド」というAIアシスタ�
 - パーミッション管理: ツール実行の許可・拒否設定
 - Plan mode: 実行前に計画を立ててユーザーに確認するモード
 - ワークツリー機能: gitのworktreeを使った安全な並行作業
+- CLAUDE.md: プロジェクトのルート（や親ディレクトリ、ユーザーホーム）に置くMemoryファイル。コーディング規約、注意点、頻出する間違いとその防止ルールなどを書いておくと、Claudeが作業前に自動で読み込んで参照する
+- スキル (Skills): `.claude/skills/<名前>/SKILL.md` に手順を書いておくことで、特定の作業を自動化できる機能。CLAUDE.mdから「この状況になったらこのスキルを使う」と参照させることで、明示的に指示しなくても自動的に発動させることも可能
+- /goal コマンド: 1回の指示ではなく「完了条件」を指定して、その条件が満たされるまでClaudeが複数ターンにわたって自律的に作業を続ける機能。完了したかどうかは別のモデルが会話内容を見て毎ターン判定するため、条件には「テストのグリーンな実行結果を貼り付ける」のように、実際に確認できる証拠を含めるのが望ましい。無制限に走らせるとコストがかさむため、ターン数や時間の上限も条件に含めるのが安全
+- 動的ワークフロー / サブエージェント: 大きなタスクをサブエージェントに分割し、並列・バックグラウンドで実行させる仕組み。Agentツールやオーケストレーションスクリプトを使って処理をスケールさせられる
 
 ### Claude API / Anthropic SDK
 - Messages API: テキスト・画像入力、ストリーミング、tool use（ツール呼び出し）
